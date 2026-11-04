@@ -1,0 +1,934 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>졸음 박멸 | AI 학습 도우미</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #20283a;
+      --muted: #6c768b;
+      --primary: #5965dc;
+      --primary-light: #eceeff;
+      --danger: #e65c70;
+      --border: #e6e9f2;
+      --green: #218568;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #5965dc, #8791f4);
+      color: white;
+      padding: 30px 20px;
+    }
+
+    .header-inner, main {
+      max-width: 1050px;
+      margin: auto;
+    }
+
+    h1 { margin: 0 0 6px; font-size: 30px; }
+    header p { margin: 0; opacity: .92; }
+
+    main { padding: 22px 16px 45px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 5px 18px rgba(35, 45, 90, .04);
+      min-width: 0;
+    }
+
+    h2 { font-size: 19px; margin: 0 0 13px; }
+    h3 { font-size: 16px; margin: 18px 0 8px; }
+
+    .muted { color: var(--muted); font-size: 13px; }
+    .status { font-size: 14px; margin: 10px 0; }
+    .status strong { color: var(--primary); }
+
+    input, select, button {
+      font: inherit;
+      border-radius: 10px;
+    }
+
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      border: 1px solid var(--border);
+      padding: 10px;
+      background: white;
+      color: var(--text);
+      margin: 5px 0 10px;
+    }
+
+    input[type="range"] { width: 100%; }
+
+    button {
+      cursor: pointer;
+      border: 0;
+      background: var(--primary);
+      color: white;
+      padding: 10px 14px;
+      font-weight: 600;
+      margin: 4px 4px 4px 0;
+    }
+
+    button.secondary {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    button.danger { background: #fff0f2; color: #c53b50; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .button-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .camera-box {
+      min-height: 210px;
+      background: #f0f2f9;
+      border: 1px dashed #cbd0e3;
+      border-radius: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      margin: 12px 0;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    #webcam-container canvas,
+    #webcam-container video,
+    #preview-image {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 12px;
+    }
+
+    #webcam-container { display: flex; justify-content: center; }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      background: var(--primary-light);
+      border-radius: 14px;
+      padding: 15px 10px;
+      text-align: center;
+    }
+
+    .metric span { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong { font-size: 25px; color: var(--primary); }
+
+    .prediction {
+      margin: 10px 0;
+      padding: 12px;
+      background: #f7f8fc;
+      border-radius: 12px;
+    }
+
+    .prediction-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .bar {
+      height: 9px;
+      background: #e5e8f3;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width .15s;
+    }
+
+    .alert-box {
+      background: #f7f8fc;
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+
+    .alert-box.sleep {
+      background: #fff0f2;
+      color: #b72d45;
+    }
+
+    .alert-box.awake {
+      background: #eaf8f2;
+      color: #176e53;
+    }
+
+    .record-list {
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .record-list li {
+      padding: 10px 4px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    canvas#chart {
+      width: 100%;
+      height: 220px;
+      display: block;
+    }
+
+    .wide { grid-column: 1 / -1; }
+
+    .small-note {
+      background: #fff8e8;
+      color: #77571d;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 10px 20px 28px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      h1 { font-size: 25px; }
+      .metric strong { font-size: 21px; }
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="header-inner">
+    <h1>졸음 박멸</h1>
+    <p>AI로 졸음 행동을 감지하고 학습 습관을 기록하는 도우미</p>
+  </div>
+</header>
+
+<main>
+  <section class="metric-row">
+    <div class="metric">
+      <span>오늘 졸음 감지</span>
+      <strong id="today-count">0</strong>
+    </div>
+    <div class="metric">
+      <span>누적 감지</span>
+      <strong id="total-count">0</strong>
+    </div>
+    <div class="metric">
+      <span>AI 모델</span>
+      <strong id="model-status" style="font-size:15px">미연결</strong>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>① AI 모델 설정</h2>
+      <label for="model-url">Teachable Machine 모델 주소</label>
+      <input
+        id="model-url"
+        type="text"
+        value="https://teachablemachine.withgoogle.com/models/2zBUgRun9/"
+      />
+
+      <label for="sleep-class">졸음 행동 클래스</label>
+      <select id="sleep-class">
+        <option value="졸음행동">졸음행동</option>
+        <option value="일반상태">일반상태</option>
+      </select>
+
+      <label for="threshold">
+        감지 신뢰도: <strong id="threshold-label">80%</strong>
+      </label>
+      <input id="threshold" type="range" min="50" max="99" value="80" />
+
+      <div class="button-row">
+        <button id="load-model">AI 모델 불러오기</button>
+      </div>
+      <p class="muted">
+        모델을 불러온 뒤 카메라를 시작해 줘. 모델 주소는 끝에 /가 있어야 해.
+      </p>
+      <div id="model-message" class="status">모델을 불러와 주세요.</div>
+      <div id="class-info" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>② 카메라 감지</h2>
+      <div id="webcam-container" class="camera-box">
+        노트북 카메라 화면이 여기에 표시돼요.
+      </div>
+
+      <div class="button-row">
+        <button id="start-camera" disabled>카메라 시작</button>
+        <button id="stop-camera" class="secondary" disabled>카메라 종료</button>
+      </div>
+
+      <div id="live-status" class="alert-box">
+        대기 중 — AI 모델을 먼저 불러와 주세요.
+      </div>
+
+      <h3>AI 예측 결과</h3>
+      <div id="predictions" class="muted">아직 예측 결과가 없어요.</div>
+      <p class="muted">
+        카메라 영상은 이 웹앱에서 분석하며 별도로 저장하지 않아요.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>③ 사진으로 AI 테스트</h2>
+      <input id="image-file" type="file" accept="image/*" />
+      <div class="camera-box" id="image-container">
+        테스트할 사진을 선택해 주세요.
+      </div>
+      <button id="test-image" class="secondary" disabled>사진 분석</button>
+      <div id="image-result" class="status muted">
+        사진 테스트는 실시간 감지 횟수에 포함되지 않아요.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>④ 마이크로비트 연결</h2>
+      <p class="muted">
+        마이크로비트가 아직 없다면 이 부분은 건너뛰어도 돼요.
+        연결할 때는 USB 케이블과 Web Serial 지원 브라우저가 필요해요.
+      </p>
+
+      <div id="serial-status" class="status">마이크로비트 미연결</div>
+      <div class="button-row">
+        <button id="connect-microbit">USB 연결</button>
+        <button id="disconnect-microbit" class="secondary" disabled>연결 해제</button>
+      </div>
+
+      <h3>연결 테스트</h3>
+      <div class="button-row">
+        <button id="test-sleep" class="secondary" disabled>졸음 신호 보내기</button>
+        <button id="test-awake" class="secondary" disabled>일반상태 신호 보내기</button>
+      </div>
+      <p class="muted">
+        전송 문자는 모델 클래스 이름과 동일한 일반상태 / 졸음행동이에요.
+      </p>
+      <div class="small-note">
+        USB 연결이 되더라도 마이크로비트에서 해당 문자를 읽고 동작하도록
+        별도의 MakeCode 프로그램을 올려야 알림이 작동해요.
+      </div>
+    </section>
+
+    <section class="card wide">
+      <h2>⑤ 졸음 기록</h2>
+      <p class="muted">
+        감지된 시각이 이 브라우저에 저장돼요. 같은 졸음 행동이 계속 이어질 때
+        중복 집계를 줄이기 위해 감지 후 15초 동안 추가 기록을 막아요.
+      </p>
+      <ul id="record-list" class="record-list"></ul>
+      <div class="button-row" style="margin-top:12px">
+        <button id="export-records" class="secondary">기록 CSV로 내보내기</button>
+        <button id="clear-records" class="danger">기록 전체 삭제</button>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <h2>⑥ 최근 7일 기록</h2>
+      <canvas id="chart" width="900" height="260"></canvas>
+      <p class="muted">날짜별로 실시간 졸음 감지 횟수를 보여 줘요.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  졸음 박멸 · AI 예측은 학습 데이터와 촬영 환경에 따라 달라질 수 있어요.
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  const STORAGE_KEY = "sleepBusterRecordsV1";
+  const COOLDOWN_MS = 15000;
+  const REQUIRED_SLEEP_FRAMES = 3;
+  const REQUIRED_AWAKE_FRAMES = 3;
+
+  let model = null;
+  let webcam = null;
+  let cameraRunning = false;
+  let loopToken = 0;
+  let imageElement = null;
+
+  let sleepFrames = 0;
+  let awakeFrames = 0;
+  let sleepLocked = false;
+  let lastRecordedAt = 0;
+
+  let serialPort = null;
+  let serialWriter = null;
+  let serialConnected = false;
+
+  let records = loadRecords();
+
+  function loadRecords() {
+    try {
+      const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveRecords() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    } catch (error) {
+      alert("기록을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.");
+      console.error(error);
+    }
+  }
+
+  function dateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function timeText(timestamp) {
+    return new Date(timestamp).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+  }
+
+  function todayRecords() {
+    const today = dateKey(new Date());
+    return records.filter(record => dateKey(new Date(record.timestamp)) === today);
+  }
+
+  function renderRecords() {
+    $("today-count").textContent = todayRecords().length;
+    $("total-count").textContent = records.length;
+
+    const list = $("record-list");
+    list.replaceChildren();
+
+    if (records.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "아직 저장된 졸음 기록이 없어요.";
+      list.appendChild(li);
+    } else {
+      records.slice(-100).reverse().forEach(record => {
+        const li = document.createElement("li");
+        const time = document.createElement("span");
+        const confidence = document.createElement("span");
+
+        time.textContent = timeText(record.timestamp);
+        confidence.textContent =
+          `신뢰도 ${Math.round((record.confidence || 0) * 100)}%`;
+
+        li.append(time, confidence);
+        list.appendChild(li);
+      });
+    }
+
+    drawChart();
+  }
+
+  function addRecord(confidence) {
+    const now = Date.now();
+
+    if (now - lastRecordedAt < COOLDOWN_MS) return;
+
+    lastRecordedAt = now;
+    const record = {
+      timestamp: now,
+      confidence: confidence
+    };
+
+    records.push(record);
+
+    // 기록이 지나치게 커지는 것을 막기 위해 최근 1000건만 유지
+    if (records.length > 1000) records = records.slice(-1000);
+
+    saveRecords();
+    renderRecords();
+  }
+
+  function drawChart() {
+    const canvas = $("chart");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const days = [];
+    const counts = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const key = dateKey(date);
+
+      days.push(`${date.getMonth() + 1}/${date.getDate()}`);
+      counts.push(records.filter(r =>
+        dateKey(new Date(r.timestamp)) === key
+      ).length);
+    }
+
+    const left = 42;
+    const right = width - 18;
+    const top = 22;
+    const bottom = height - 42;
+    const plotHeight = bottom - top;
+    const maxValue = Math.max(4, ...counts);
+    const step = (right - left) / days.length;
+
+    ctx.strokeStyle = "#e4e7f1";
+    ctx.fillStyle = "#6c768b";
+    ctx.font = "13px Arial";
+
+    for (let i = 0; i <= 4; i++) {
+      const y = bottom - (plotHeight * i / 4);
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
+      ctx.stroke();
+
+      ctx.textAlign = "right";
+      ctx.fillText(String(Math.round(maxValue * i / 4)), left - 8, y + 4);
+    }
+
+    counts.forEach((count, i) => {
+      const barWidth = step * 0.48;
+      const barHeight = (count / maxValue) * plotHeight;
+      const x = left + i * step + (step - barWidth) / 2;
+      const y = bottom - barHeight;
+
+      ctx.fillStyle = "#6873e6";
+      ctx.fillRect(x, y, barWidth, barHeight);
+
+      ctx.fillStyle = "#39415b";
+      ctx.textAlign = "center";
+      ctx.fillText(String(count), x + barWidth / 2, y - 6);
+      ctx.fillStyle = "#6c768b";
+      ctx.fillText(days[i], x + barWidth / 2, bottom + 22);
+    });
+  }
+
+  function setLiveStatus(message, type = "") {
+    const box = $("live-status");
+    box.textContent = message;
+    box.className = "alert-box" + (type ? " " + type : "");
+  }
+
+  function getThreshold() {
+    return Number($("threshold").value) / 100;
+  }
+
+  $("threshold").addEventListener("input", () => {
+    $("threshold-label").textContent = $("threshold").value + "%";
+  });
+
+  function showPredictions(predictions, target) {
+    target.replaceChildren();
+
+    predictions.forEach(prediction => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "prediction";
+
+      const line = document.createElement("div");
+      line.className = "prediction-line";
+
+      const name = document.createElement("span");
+      name.textContent = prediction.className;
+
+      const value = document.createElement("strong");
+      value.textContent = Math.round(prediction.probability * 100) + "%";
+
+      line.append(name, value);
+
+      const bar = document.createElement("div");
+      bar.className = "bar";
+
+      const fill = document.createElement("div");
+      fill.className = "bar-fill";
+      fill.style.width = Math.round(prediction.probability * 100) + "%";
+
+      bar.appendChild(fill);
+      wrapper.append(line, bar);
+      target.appendChild(wrapper);
+    });
+  }
+
+  function bestPrediction(predictions) {
+    return predictions.reduce((best, current) =>
+      current.probability > best.probability ? current : best
+    );
+  }
+
+  async function loadModel() {
+    const rawURL = $("model-url").value.trim();
+    if (!rawURL) {
+      alert("모델 주소를 입력해 주세요.");
+      return;
+    }
+
+    try {
+      $("load-model").disabled = true;
+      $("model-message").textContent = "AI 모델을 불러오는 중이에요...";
+      $("model-status").textContent = "로딩 중";
+
+      const modelURL = rawURL.endsWith("/") ? rawURL : rawURL + "/";
+      model = await tmImage.load(
+        modelURL + "model.json",
+        modelURL + "metadata.json"
+      );
+
+      const classNames = model.getClassLabels();
+      $("class-info").textContent =
+        "모델 클래스: " + classNames.join(", ");
+
+      if (!classNames.includes("졸음행동") ||
+          !classNames.includes("일반상태")) {
+        $("model-message").textContent =
+          "모델은 불러왔지만 클래스 이름을 확인해 주세요.";
+      } else {
+        $("model-message").textContent = "AI 모델을 성공적으로 불러왔어요.";
+      }
+
+      $("model-status").textContent = "연결됨";
+      $("start-camera").disabled = false;
+      $("test-image").disabled = !imageElement;
+    } catch (error) {
+      console.error(error);
+      model = null;
+      $("model-status").textContent = "오류";
+      $("model-message").textContent =
+        "모델을 불러오지 못했어요. 주소와 인터넷 연결을 확인해 주세요.";
+      alert("모델 로딩 오류: " + (error.message || error));
+    } finally {
+      $("load-model").disabled = false;
+    }
+  }
+
+  $("load-model").addEventListener("click", loadModel);
+
+  async function startCamera() {
+    if (!model) {
+      alert("먼저 AI 모델을 불러와 주세요.");
+      return;
+    }
+    if (cameraRunning) return;
+
+    try {
+      $("start-camera").disabled = true;
+      $("model-message").textContent = "카메라를 준비하고 있어요...";
+
+      webcam = new tmImage.Webcam(320, 240, true);
+      await webcam.setup();
+      await webcam.play();
+
+      $("webcam-container").replaceChildren(webcam.canvas);
+      cameraRunning = true;
+      sleepFrames = 0;
+      awakeFrames = 0;
+      sleepLocked = false;
+
+      $("stop-camera").disabled = false;
+      $("model-message").textContent = "카메라가 작동 중이에요.";
+      setLiveStatus("AI가 학습 상태를 분석하고 있어요.");
+
+      const myToken = ++loopToken;
+      runPredictionLoop(myToken);
+    } catch (error) {
+      console.error(error);
+      $("model-message").textContent =
+        "카메라를 시작하지 못했어요. 카메라 권한과 보안 연결을 확인해 주세요.";
+      alert("카메라 오류: " + (error.message || error));
+      $("start-camera").disabled = !model;
+    }
+  }
+
+  async function runPredictionLoop(token) {
+    if (!cameraRunning || token !== loopToken) return;
+
+    try {
+      webcam.update();
+      const predictions = await model.predict(webcam.canvas);
+      showPredictions(predictions, $("predictions"));
+
+      const sleepClass = $("sleep-class").value;
+      const sleepPrediction = predictions.find(
+        p => p.className === sleepClass
+      );
+      const otherPrediction = predictions.find(
+        p => p.className !== sleepClass
+      );
+
+      if (!sleepPrediction) {
+        setLiveStatus("졸음 클래스 이름을 모델에서 찾지 못했어요.");
+      } else {
+        const threshold = getThreshold();
+        const isSleep =
+          sleepPrediction.probability >= threshold &&
+          (!otherPrediction ||
+            sleepPrediction.probability >= otherPrediction.probability);
+
+        if (isSleep) {
+          sleepFrames++;
+          awakeFrames = 0;
+
+          if (sleepFrames >= REQUIRED_SLEEP_FRAMES && !sleepLocked) {
+            sleepLocked = true;
+            addRecord(sleepPrediction.probability);
+            setLiveStatus(
+              `졸음 행동 감지! 신뢰도 ${Math.round(sleepPrediction.probability * 100)}%`,
+              "sleep"
+            );
+            sendSerialMessage("졸음행동");
+          } else if (sleepLocked) {
+            setLiveStatus("졸음 행동이 이어지고 있어요.", "sleep");
+          } else {
+            setLiveStatus("졸음 행동인지 확인 중이에요.");
+          }
+        } else {
+          sleepFrames = 0;
+          awakeFrames++;
+
+          if (awakeFrames >= REQUIRED_AWAKE_FRAMES) {
+            sleepLocked = false;
+          }
+
+          setLiveStatus(
+            `일반 상태로 판단 중 · 졸음 신뢰도 ${Math.round(sleepPrediction.probability * 100)}%`,
+            "awake"
+          );
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      setLiveStatus("AI 분석 중 오류가 발생했어요. 콘솔을 확인해 주세요.");
+    }
+
+    if (cameraRunning && token === loopToken) {
+      requestAnimationFrame(() => runPredictionLoop(token));
+    }
+  }
+
+  async function stopCamera() {
+    cameraRunning = false;
+    loopToken++;
+
+    if (webcam) {
+      try {
+        await webcam.stop();
+      } catch (error) {
+        console.warn(error);
+      }
+      webcam = null;
+    }
+
+    $("webcam-container").replaceChildren(
+      document.createTextNode("카메라가 종료되었어요.")
+    );
+    $("start-camera").disabled = !model;
+    $("stop-camera").disabled = true;
+    setLiveStatus("카메라가 종료되었어요.");
+  }
+
+  $("start-camera").addEventListener("click", startCamera);
+  $("stop-camera").addEventListener("click", stopCamera);
+
+  $("image-file").addEventListener("change", event => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (imageElement && imageElement.src.startsWith("blob:")) {
+      URL.revokeObjectURL(imageElement.src);
+    }
+
+    imageElement = new Image();
+    imageElement.onload = () => {
+      $("image-container").replaceChildren(imageElement);
+      $("test-image").disabled = !model;
+    };
+    imageElement.onerror = () => {
+      $("image-container").textContent = "이미지를 열지 못했어요.";
+    };
+    imageElement.src = URL.createObjectURL(file);
+  });
+
+  $("test-image").addEventListener("click", async () => {
+    if (!model || !imageElement) return;
+
+    try {
+      $("image-result").textContent = "사진 분석 중...";
+      const predictions = await model.predict(imageElement);
+      showPredictions(predictions, $("image-result"));
+
+      const best = bestPrediction(predictions);
+      $("image-result").insertAdjacentText(
+        "afterbegin",
+        `가장 높은 예측: ${best.className} (${Math.round(best.probability * 100)}%). `
+      );
+    } catch (error) {
+      console.error(error);
+      $("image-result").textContent =
+        "사진 분석에 실패했어요: " + (error.message || error);
+    }
+  });
+
+  async function connectMicrobit() {
+    if (!("serial" in navigator)) {
+      alert("이 브라우저는 Web Serial을 지원하지 않아요. 데스크톱 Chrome 또는 Edge를 사용해 주세요.");
+      return;
+    }
+
+    try {
+      serialPort = await navigator.serial.requestPort();
+      await serialPort.open({ baudRate: 115200 });
+
+      const encoder = new TextEncoderStream();
+      encoder.readable.pipeTo(serialPort.writable).catch(error => {
+        console.warn("Serial stream closed:", error);
+      });
+
+      serialWriter = encoder.writable.getWriter();
+      serialConnected = true;
+
+      $("serial-status").textContent = "마이크로비트 USB 연결됨";
+      $("disconnect-microbit").disabled = false;
+      $("test-sleep").disabled = false;
+      $("test-awake").disabled = false;
+    } catch (error) {
+      console.error(error);
+      serialConnected = false;
+      $("serial-status").textContent = "연결 실패 또는 연결 취소";
+      alert("USB 연결 오류: " + (error.message || error));
+    }
+  }
+
+  async function sendSerialMessage(message) {
+    if (!serialConnected || !serialWriter) return;
+
+    try {
+      await serialWriter.write(message + "\n");
+      $("serial-status").textContent = "마지막 전송: " + message;
+    } catch (error) {
+      console.error(error);
+      $("serial-status").textContent = "전송 실패";
+    }
+  }
+
+  async function disconnectMicrobit() {
+    serialConnected = false;
+
+    try {
+      if (serialWriter) {
+        await serialWriter.close();
+        serialWriter = null;
+      }
+      if (serialPort) {
+        await serialPort.close();
+        serialPort = null;
+      }
+    } catch (error) {
+      console.warn(error);
+    }
+
+    $("serial-status").textContent = "마이크로비트 미연결";
+    $("disconnect-microbit").disabled = true;
+    $("test-sleep").disabled = true;
+    $("test-awake").disabled = true;
+  }
+
+  $("connect-microbit").addEventListener("click", connectMicrobit);
+  $("disconnect-microbit").addEventListener("click", disconnectMicrobit);
+  $("test-sleep").addEventListener("click", () => sendSerialMessage("졸음행동"));
+  $("test-awake").addEventListener("click", () => sendSerialMessage("일반상태"));
+
+  $("export-records").addEventListener("click", () => {
+    const header = "timestamp,datetime,confidence";
+    const rows = records.map(record => {
+      const date = timeText(record.timestamp);
+      const confidence = Math.round((record.confidence || 0) * 100);
+      return `${record.timestamp},"${date}",${confidence}`;
+    });
+
+    const csv = "\uFEFF" + [header, ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "졸음박멸_기록.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  $("clear-records").addEventListener("click", () => {
+    if (!confirm("저장된 졸음 기록을 모두 삭제할까요?")) return;
+    records = [];
+    saveRecords();
+    renderRecords();
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (webcam) webcam.stop();
+  });
+
+  renderRecords();
+})();
+</script>
+</body>
+</html>
