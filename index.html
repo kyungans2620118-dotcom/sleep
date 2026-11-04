@@ -746,9 +746,12 @@
           sleepFrames = 0;
           awakeFrames++;
 
-          if (awakeFrames >= REQUIRED_AWAKE_FRAMES) {
-            sleepLocked = false;
-          }
+         
+if (awakeFrames >= REQUIRED_AWAKE_FRAMES && sleepLocked) {
+    sleepLocked = false;
+    sendSerialMessage("일반상태");
+}
+
 
           setLiveStatus(
             `일반 상태로 판단 중 · 졸음 신뢰도 ${Math.round(sleepPrediction.probability * 100)}%`,
