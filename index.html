@@ -859,17 +859,27 @@
     }
   }
 
-  async function sendSerialMessage(message) {
-    if (!serialConnected || !serialWriter) return;
+async function sendSerialMessage(message) {
+  console.log("전송 버튼 클릭:", message);
 
-    try {
-      await serialWriter.write(message + "\n");
-      $("serial-status").textContent = "마지막 전송: " + message;
-    } catch (error) {
-      console.error(error);
-      $("serial-status").textContent = "전송 실패";
-    }
+  if (!serialConnected || !serialWriter) {
+    $("serial-status").textContent = "전송 실패: USB 연결 상태를 확인해 주세요.";
+    return;
   }
+
+  try {
+    $("serial-status").textContent = "전송 중: " + message;
+
+    await serialWriter.write(message + "\n");
+
+    $("serial-status").textContent = "마지막 전송: " + message;
+    console.log("전송 완료:", message);
+
+  } catch (error) {
+    console.error("Serial 전송 오류:", error);
+    $("serial-status").textContent = "전송 오류: " + error.message;
+  }
+}
 
   async function disconnectMicrobit() {
     serialConnected = false;
